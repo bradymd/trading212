@@ -41,6 +41,11 @@ class DataStore {
         // When we last fetched data
         lastFetchTime: null,
 
+        // Cached instruments metadata (ticker -> {name, currencyCode, isin})
+        // This rarely changes and contains thousands of entries
+        instruments: null,
+        instrumentsCacheTime: null,
+
         // User preferences
         preferences: {
           sortBy: 'dailyChangePercent', // Default sort column
@@ -247,6 +252,71 @@ class DataStore {
 
     // Sort by worst performers first
     return downtrends.sort((a, b) => a.changePercent - b.changePercent);
+  }
+
+
+  // ===========================================================================
+  // INSTRUMENTS CACHE
+  // ===========================================================================
+
+  /**
+   * Save instruments metadata to disk cache
+   *
+   * Instruments data rarely changes and contains thousands of entries.
+   * Caching it avoids an API call on every app startup.
+   *
+   * @param {Object} instrumentsMap - Map-like object of ticker -> metadata
+   */
+  saveInstruments(instrumentsMap) {
+    // Convert Map to plain object for JSON storage
+    const instrumentsObj = {};
+    for (const [ticker, meta] of instrumentsMap) {
+      instrumentsObj[ticker] = meta;
+    }
+
+    this.store.set('instruments', instrumentsObj);
+    this.store.set('instrumentsCacheTime', new Date().toISOString());
+    console.log(`[DataStore] Cached ${Object.keys(instrumentsObj).length} instruments to disk`);
+  }
+
+
+  /**
+   * Get cached instruments from disk
+   *
+   * @returns {Map|null} Map of ticker -> metadata, or null if not cached
+   */
+  getCachedInstruments() {
+    const instrumentsObj = this.store.get('instruments');
+    if (!instrumentsObj) {
+      return null;
+    }
+
+    // Convert back to Map
+    const map = new Map();
+    for (const [ticker, meta] of Object.entries(instrumentsObj)) {
+      map.set(ticker, meta);
+    }
+    return map;
+  }
+
+
+  /**
+   * Check if instruments cache is valid (less than 24 hours old)
+   *
+   * @returns {boolean} True if cache exists and is fresh
+   */
+  isInstrumentsCacheValid() {
+    const cacheTime = this.store.get('instrumentsCacheTime');
+    if (!cacheTime) {
+      return false;
+    }
+
+    const cacheDate = new Date(cacheTime);
+    const now = new Date();
+    const hoursSinceCache = (now - cacheDate) / (1000 * 60 * 60);
+
+    // Cache is valid for 24 hours
+    return hoursSinceCache < 24;
   }
 
 

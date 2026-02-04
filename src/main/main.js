@@ -326,23 +326,38 @@ async function refreshData() {
     const cash = await apiClient.getCashBalance();
 
     // Fetch instruments metadata if not cached (for company names)
-    // Only fetch once - this contains thousands of instruments
+    // First check disk cache, then memory, then API
     if (!instrumentsMap) {
-      console.log('[Main] Fetching instruments metadata...');
-      try {
-        const instruments = await apiClient.getInstruments();
-        instrumentsMap = new Map();
-        for (const inst of instruments) {
-          instrumentsMap.set(inst.ticker, {
-            name: inst.name,
-            currencyCode: inst.currencyCode,
-            isin: inst.isin
-          });
+      // Try loading from disk cache first
+      if (dataStore.isInstrumentsCacheValid()) {
+        console.log('[Main] Loading instruments from disk cache...');
+        instrumentsMap = dataStore.getCachedInstruments();
+        if (instrumentsMap) {
+          console.log(`[Main] Loaded ${instrumentsMap.size} instruments from disk cache`);
         }
-        console.log(`[Main] Loaded metadata for ${instruments.length} instruments`);
-      } catch (err) {
-        console.warn('[Main] Could not fetch instruments metadata:', err.message);
-        instrumentsMap = new Map(); // Empty map to prevent retrying
+      }
+
+      // If not in cache, fetch from API
+      if (!instrumentsMap) {
+        console.log('[Main] Fetching instruments metadata from API...');
+        try {
+          const instruments = await apiClient.getInstruments();
+          instrumentsMap = new Map();
+          for (const inst of instruments) {
+            instrumentsMap.set(inst.ticker, {
+              name: inst.name,
+              currencyCode: inst.currencyCode,
+              isin: inst.isin
+            });
+          }
+          console.log(`[Main] Loaded metadata for ${instruments.length} instruments`);
+
+          // Save to disk cache for next time
+          dataStore.saveInstruments(instrumentsMap);
+        } catch (err) {
+          console.warn('[Main] Could not fetch instruments metadata:', err.message);
+          instrumentsMap = new Map(); // Empty map to prevent retrying
+        }
       }
     }
 
@@ -502,11 +517,8 @@ async function initialize() {
     createWindow();
 
     // Try to fetch initial data, but don't quit if it fails
+    // (No connection test - we'll just try to fetch data directly to save an API call)
     try {
-      console.log('[Main] Testing API connection...');
-      await apiClient.testConnection();
-      console.log('[Main] API connection successful');
-
       // Do initial data fetch
       await refreshData();
     } catch (apiError) {
@@ -546,6 +558,8 @@ async function initialize() {
 
 /**
  * Set up auto-updater event handlers
+ *
+ * Like Personal-Hub, we don't auto-download. We ask the user first.
  */
 function setupAutoUpdater() {
   // Don't check for updates in development
@@ -554,6 +568,10 @@ function setupAutoUpdater() {
     return;
   }
 
+  // Don't auto-download - let user decide
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
   // Log update events
   autoUpdater.on('checking-for-update', () => {
     console.log('[Updater] Checking for updates...');
@@ -561,12 +579,27 @@ function setupAutoUpdater() {
 
   autoUpdater.on('update-available', (info) => {
     console.log('[Updater] Update available:', info.version);
+    // Ask user if they want to download
     dialog.showMessageBox(mainWindow, {
-      type: 'info',
+      type: 'question',
       title: 'Update Available',
       message: `A new version (${info.version}) is available.`,
-      detail: 'It will be downloaded in the background. You will be notified when it is ready to install.',
-      buttons: ['OK']
+      detail: 'Would you like to download it now?',
+      buttons: ['Download', 'Later']
+    }).then((result) => {
+      if (result.response === 0) {
+        console.log('[Updater] User chose to download update');
+        autoUpdater.downloadUpdate().catch((err) => {
+          console.error('[Updater] Download failed:', err.message);
+          dialog.showMessageBox(mainWindow, {
+            type: 'error',
+            title: 'Download Failed',
+            message: `Could not download update: ${err.message}`
+          });
+        });
+      } else {
+        console.log('[Updater] User deferred update');
+      }
     });
   });
 
@@ -597,12 +630,13 @@ function setupAutoUpdater() {
     console.error('[Updater] Error:', error.message);
   });
 
-  // Check for updates (silently, don't bother user if no update)
-  // Wrap in try-catch to handle any unhandled promise rejections
-  autoUpdater.checkForUpdatesAndNotify().catch((error) => {
-    console.error('[Updater] Failed to check for updates:', error.message);
-    // Silently ignore - updates are optional, app still works
-  });
+  // Check for updates after a short delay (don't download, just check)
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch((error) => {
+      console.error('[Updater] Failed to check for updates:', error.message);
+      // Silently ignore - updates are optional, app still works
+    });
+  }, 3000);
 }
 
 
