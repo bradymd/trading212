@@ -512,7 +512,11 @@ function setupAutoUpdater() {
   });
 
   // Check for updates (silently, don't bother user if no update)
-  autoUpdater.checkForUpdatesAndNotify();
+  // Wrap in try-catch to handle any unhandled promise rejections
+  autoUpdater.checkForUpdatesAndNotify().catch((error) => {
+    console.error('[Updater] Failed to check for updates:', error.message);
+    // Silently ignore - updates are optional, app still works
+  });
 }
 
 

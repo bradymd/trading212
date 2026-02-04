@@ -1,6 +1,6 @@
 {
   "name": "trading212-viewer",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Read-only portfolio viewer for Trading 212 Stocks & Shares ISA",
   "main": "src/main/main.js",
   "scripts": {
