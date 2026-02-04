@@ -92,19 +92,25 @@ const elements = {
 // =============================================================================
 
 /**
- * Check if a ticker is a UK stock (priced in pence, not pounds)
+ * Check if a position is priced in pence (GBX) rather than pounds (GBP)
  *
- * UK stocks on Trading 212 have tickers ending in 'l_EQ' (London Stock Exchange)
- * Their prices are in GBX (pence) not GBP (pounds), so we need to divide by 100
+ * UK stocks trade in GBX (pence), so prices need to be divided by 100.
+ * We check the instrument currency code first (most reliable), then fall
+ * back to ticker pattern matching.
  *
- * @param {string} ticker - The full ticker symbol (e.g., "BPl_EQ", "GOOGL_US_EQ")
- * @returns {boolean} True if this is a UK stock priced in pence
+ * @param {Object} position - Position object with instrumentCurrency and ticker
+ * @returns {boolean} True if priced in pence
  */
-function isUkStock(ticker) {
-  if (!ticker) return false;
-  // UK stocks end with 'l_EQ' (lowercase L for London)
-  // But NOT US stocks like GOOGL_US_EQ (uppercase L is part of ticker name)
-  return ticker.endsWith('l_EQ');
+function isPricedInPence(position) {
+  // Best method: check the instrument currency code
+  if (position?.instrumentCurrency === 'GBX') {
+    return true;
+  }
+  // Fallback: check ticker pattern (London stocks end in lowercase 'l_EQ')
+  if (position?.ticker?.endsWith('l_EQ')) {
+    return true;
+  }
+  return false;
 }
 
 
@@ -112,11 +118,11 @@ function isUkStock(ticker) {
  * Convert price from pence to pounds if needed
  *
  * @param {number} price - The price value
- * @param {string} ticker - The ticker to check if it's a UK stock
- * @returns {number} Price in pounds (converted if UK stock)
+ * @param {Object} position - Position object to check currency
+ * @returns {number} Price in pounds (converted if in pence)
  */
-function normalizePriceToGbp(price, ticker) {
-  if (isUkStock(ticker)) {
+function normalizePriceToGbp(price, position) {
+  if (isPricedInPence(position)) {
     return price / 100; // Convert pence to pounds
   }
   return price;
@@ -213,14 +219,14 @@ function sortPositions(positions) {
 
       case 'ppl':
         // Normalize P/L for UK stocks when sorting
-        aValue = normalizePriceToGbp(a.ppl, a.ticker) || 0;
-        bValue = normalizePriceToGbp(b.ppl, b.ticker) || 0;
+        aValue = normalizePriceToGbp(a.ppl, a) || 0;
+        bValue = normalizePriceToGbp(b.ppl, b) || 0;
         break;
 
       case 'currentValue':
         // Normalize prices for UK stocks when sorting by value
-        aValue = (a.quantity * normalizePriceToGbp(a.currentPrice, a.ticker)) || 0;
-        bValue = (b.quantity * normalizePriceToGbp(b.currentPrice, b.ticker)) || 0;
+        aValue = (a.quantity * normalizePriceToGbp(a.currentPrice, a)) || 0;
+        bValue = (b.quantity * normalizePriceToGbp(b.currentPrice, b)) || 0;
         break;
 
       case 'shortTicker':
@@ -332,12 +338,12 @@ function renderPositions() {
   } else {
     for (const pos of positions) {
       // Normalize prices from pence to pounds for UK stocks
-      const avgPrice = normalizePriceToGbp(pos.averagePrice, pos.ticker);
-      const curPrice = normalizePriceToGbp(pos.currentPrice, pos.ticker);
+      const avgPrice = normalizePriceToGbp(pos.averagePrice, pos);
+      const curPrice = normalizePriceToGbp(pos.currentPrice, pos);
       const currentValue = pos.quantity * curPrice;
 
       // P/L also needs normalization for UK stocks (API returns pence)
-      const ppl = normalizePriceToGbp(pos.ppl, pos.ticker);
+      const ppl = normalizePriceToGbp(pos.ppl, pos);
 
       const dailyChangeClass = getChangeClass(pos.dailyChangePercent);
       const pplClass = getChangeClass(ppl);
@@ -346,7 +352,7 @@ function renderPositions() {
       let dailyChangeDisplay = '--';
       if (pos.hasYesterdayData) {
         // Daily change also needs normalization for UK stocks
-        const normalizedDailyChange = normalizePriceToGbp(pos.dailyChange, pos.ticker);
+        const normalizedDailyChange = normalizePriceToGbp(pos.dailyChange, pos);
         const changeAmount = normalizedDailyChange * pos.quantity;
         dailyChangeDisplay = `
           <span class="${dailyChangeClass}">${formatCurrency(changeAmount)}</span>
