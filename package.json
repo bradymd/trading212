@@ -1,0 +1,26 @@
+{
+  "name": "trading212-viewer",
+  "version": "1.0.0",
+  "description": "Read-only portfolio viewer for Trading 212 Stocks & Shares ISA",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "NODE_ENV=development electron ."
+  },
+  "keywords": [
+    "trading212",
+    "portfolio",
+    "stocks",
+    "isa",
+    "electron"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "electron-store": "^8.1.0"
+  }
+}

@@ -1,0 +1,487 @@
+/**
+ * styles.css
+ * ==========
+ * Styling for Trading 212 Portfolio Viewer
+ *
+ * Design principles:
+ * - Clean, readable interface
+ * - Clear visual hierarchy
+ * - Color coding for gains (green) and losses (red)
+ * - Responsive layout
+ *
+ * Color scheme:
+ * - Background: Dark (#1a1a2e, #16213e)
+ * - Text: Light (#eee, #aaa)
+ * - Gains: Green (#00c853)
+ * - Losses: Red (#ff5252)
+ * - Accent: Blue (#4fc3f7)
+ */
+
+
+/* ==========================================================================
+   CSS VARIABLES (Customizable Theme)
+   ========================================================================== */
+
+:root {
+  /* Background colors */
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-card: #0f3460;
+
+  /* Text colors */
+  --text-primary: #eeeeee;
+  --text-secondary: #aaaaaa;
+  --text-muted: #666666;
+
+  /* Accent colors */
+  --color-gain: #00c853;
+  --color-loss: #ff5252;
+  --color-accent: #4fc3f7;
+  --color-warning: #ffc107;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  /* Shadows */
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+
+/* ==========================================================================
+   RESET AND BASE STYLES
+   ========================================================================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+               Ubuntu, Cantarell, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+
+/* ==========================================================================
+   HEADER
+   ========================================================================== */
+
+.app-header {
+  background-color: var(--bg-secondary);
+  padding: var(--spacing-md) var(--spacing-lg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.last-update {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+
+/* ==========================================================================
+   BUTTONS
+   ========================================================================== */
+
+.btn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn-primary {
+  background-color: var(--color-accent);
+  color: var(--bg-primary);
+}
+
+.btn-primary:hover {
+  background-color: #81d4fa;
+}
+
+.btn-small {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.btn-small:hover {
+  color: var(--text-primary);
+}
+
+
+/* ==========================================================================
+   MAIN CONTENT
+   ========================================================================== */
+
+.main-content {
+  flex: 1;
+  padding: var(--spacing-lg);
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+
+/* ==========================================================================
+   ERROR BANNER
+   ========================================================================== */
+
+.error-banner {
+  background-color: var(--color-loss);
+  color: white;
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-lg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.error-banner.hidden {
+  display: none;
+}
+
+
+/* ==========================================================================
+   SUMMARY SECTION
+   ========================================================================== */
+
+.summary-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+.summary-section h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-md);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.card {
+  background-color: var(--bg-card);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.card-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.card-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.card-subvalue {
+  font-size: 0.95rem;
+  margin-top: var(--spacing-xs);
+}
+
+
+/* ==========================================================================
+   POSITIONS SECTION
+   ========================================================================== */
+
+.positions-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+.positions-section h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-md);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.count-badge {
+  background-color: var(--color-accent);
+  color: var(--bg-primary);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.table-controls {
+  margin-bottom: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.table-controls label {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.table-controls select {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.table-controls select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.table-container {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.positions-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--bg-card);
+}
+
+.positions-table th,
+.positions-table td {
+  padding: var(--spacing-md);
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.positions-table th {
+  background-color: var(--bg-secondary);
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.positions-table th.number,
+.positions-table td.number {
+  text-align: right;
+}
+
+.positions-table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.positions-table .loading-row td {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: var(--spacing-xl);
+}
+
+/* Ticker styling */
+.ticker-cell {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+/* Gain/Loss coloring */
+.gain {
+  color: var(--color-gain);
+}
+
+.loss {
+  color: var(--color-loss);
+}
+
+.neutral {
+  color: var(--text-secondary);
+}
+
+
+/* ==========================================================================
+   ALERTS SECTION
+   ========================================================================== */
+
+.alerts-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+.alerts-section h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-md);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.alerts-container {
+  background-color: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  box-shadow: var(--shadow-card);
+}
+
+.no-alerts {
+  color: var(--text-muted);
+  text-align: center;
+  padding: var(--spacing-md);
+}
+
+.alert-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.alert-item:last-child {
+  border-bottom: none;
+}
+
+.alert-icon {
+  font-size: 1.5rem;
+}
+
+.alert-content {
+  flex: 1;
+}
+
+.alert-title {
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+}
+
+.alert-message {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.alert-time {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+/* Downtrends */
+.downtrends-container {
+  margin-top: var(--spacing-md);
+  background-color: rgba(255, 193, 7, 0.1);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+}
+
+.downtrends-container.hidden {
+  display: none;
+}
+
+.downtrends-container h3 {
+  font-size: 1rem;
+  color: var(--color-warning);
+  margin-bottom: var(--spacing-sm);
+}
+
+#downtrends-list {
+  list-style: none;
+}
+
+#downtrends-list li {
+  padding: var(--spacing-sm) 0;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+#downtrends-list li:last-child {
+  border-bottom: none;
+}
+
+
+/* ==========================================================================
+   FOOTER
+   ========================================================================== */
+
+.app-footer {
+  background-color: var(--bg-secondary);
+  padding: var(--spacing-md);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+
+/* ==========================================================================
+   UTILITY CLASSES
+   ========================================================================== */
+
+.hidden {
+  display: none !important;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.font-mono {
+  font-family: 'Courier New', Courier, monospace;
+}

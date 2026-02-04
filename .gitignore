@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Configuration with secrets
+config/config.json
+
+# Environment variables (use .env.example as template)
+.env
+.env.local
+.env.*.local
+
+# Electron build output
+dist/
+out/
+
+# Local data storage
+data/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

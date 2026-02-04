@@ -1,0 +1,14 @@
+{
+  "_comment": "Non-sensitive settings. API credentials should be in .env file.",
+
+  "polling": {
+    "_comment": "How often to refresh data (in milliseconds). 3600000 = 1 hour",
+    "intervalMs": 3600000
+  },
+
+  "alerts": {
+    "_comment": "Threshold percentages for alerts. Set to null to disable.",
+    "dailyLossThreshold": -5,
+    "dailyGainThreshold": 10
+  }
+}
