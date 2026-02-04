@@ -409,27 +409,41 @@ async function initialize() {
       dailyGainThreshold: config.alerts?.dailyGainThreshold ?? DEFAULTS.DAILY_GAIN_ALERT_THRESHOLD
     });
 
-    // Test API connection
-    console.log('[Main] Testing API connection...');
-    await apiClient.testConnection();
-    console.log('[Main] API connection successful');
-
     // Set up IPC handlers
     setupIpcHandlers();
 
-    // Create the window
+    // Create the window first - we want to show UI even if API fails
     createWindow();
 
-    // Do initial data fetch
-    await refreshData();
+    // Try to fetch initial data, but don't quit if it fails
+    try {
+      console.log('[Main] Testing API connection...');
+      await apiClient.testConnection();
+      console.log('[Main] API connection successful');
 
-    // Start polling for updates
+      // Do initial data fetch
+      await refreshData();
+    } catch (apiError) {
+      console.error('[Main] Initial API call failed:', apiError.message);
+
+      // Send error to renderer so user sees it in the UI
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.on('did-finish-load', () => {
+          mainWindow.webContents.send(IPC_CHANNELS.ERROR, {
+            message: `Could not load data: ${apiError.message}\n\nClick Refresh to try again.`,
+            timestamp: new Date().toISOString()
+          });
+        });
+      }
+    }
+
+    // Start polling for updates (will retry periodically)
     startPolling();
 
   } catch (error) {
     console.error('[Main] Initialization failed:', error.message);
 
-    // Show error dialog
+    // Only show fatal error dialog for config issues (missing credentials etc.)
     dialog.showErrorBox('Startup Error', error.message);
 
     app.quit();
