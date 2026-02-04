@@ -36,10 +36,14 @@
  * └─────────────────────────────────────────────────────────────────┘
  */
 
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
+
+// Get version from package.json
+const packageJson = require('../../package.json');
+const appVersion = packageJson.version;
 
 // Determine if we're running in development or packaged
 const isDev = !app.isPackaged;
@@ -214,6 +218,88 @@ function createWindow() {
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
   }
+
+  // Set up application menu
+  setupMenu();
+}
+
+
+/**
+ * Set up the application menu with Help > About
+ */
+function setupMenu() {
+  const template = [
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Refresh Data',
+          accelerator: 'CmdOrCtrl+R',
+          click: () => {
+            refreshData();
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Quit',
+          accelerator: 'CmdOrCtrl+Q',
+          click: () => {
+            app.quit();
+          }
+        }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' }
+      ]
+    },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'About',
+          click: () => {
+            dialog.showMessageBox(mainWindow, {
+              type: 'info',
+              title: 'About Trading 212 Viewer',
+              message: `Trading 212 Viewer`,
+              detail: `Version: ${appVersion}\n\nA read-only portfolio viewer for Trading 212.\n\nhttps://github.com/bradymd/trading212`
+            });
+          }
+        },
+        {
+          label: 'Check for Updates',
+          click: () => {
+            if (isDev) {
+              dialog.showMessageBox(mainWindow, {
+                type: 'info',
+                title: 'Updates',
+                message: 'Update checking is disabled in development mode.'
+              });
+            } else {
+              autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+                dialog.showMessageBox(mainWindow, {
+                  type: 'error',
+                  title: 'Update Check Failed',
+                  message: `Could not check for updates: ${err.message}`
+                });
+              });
+            }
+          }
+        }
+      ]
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
 }
 
 
