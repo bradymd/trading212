@@ -5,7 +5,10 @@
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "NODE_ENV=development electron ."
+    "dev": "NODE_ENV=development electron .",
+    "build": "electron-builder --linux AppImage",
+    "build:all": "electron-builder --linux AppImage deb",
+    "release": "electron-builder --linux AppImage --publish always"
   },
   "keywords": [
     "trading212",
@@ -14,13 +17,53 @@
     "isa",
     "electron"
   ],
-  "author": "",
+  "author": "bradymd",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bradymd/trading212.git"
+  },
   "devDependencies": {
-    "electron": "^28.0.0"
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
   },
   "dependencies": {
     "dotenv": "^16.3.1",
-    "electron-store": "^8.1.0"
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.1.7"
+  },
+  "build": {
+    "appId": "com.bradymd.trading212-viewer",
+    "productName": "Trading 212 Viewer",
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Finance",
+      "icon": "build/icon.png"
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "bradymd",
+      "repo": "trading212"
+    },
+    "files": [
+      "src/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".env.example",
+        "to": ".env.example"
+      },
+      {
+        "from": "config/config.example.json",
+        "to": "config/config.example.json"
+      }
+    ]
   }
 }

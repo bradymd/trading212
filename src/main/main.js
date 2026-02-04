@@ -36,13 +36,21 @@
  * └─────────────────────────────────────────────────────────────────┘
  */
 
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
+
+// Determine if we're running in development or packaged
+const isDev = !app.isPackaged;
 
 // Load environment variables from .env file
-// This must be done before accessing process.env
-require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+// When packaged, look in user's config directory; in dev, look in project root
+const envPath = isDev
+  ? path.join(__dirname, '../../.env')
+  : path.join(app.getPath('userData'), '.env');
+
+require('dotenv').config({ path: envPath });
 
 // Our modules
 const { Trading212Client } = require('./api/trading212');
@@ -102,21 +110,26 @@ function loadConfig() {
 
   // Validate required environment variables
   if (!apiKey) {
+    const envLocation = isDev
+      ? 'project root'
+      : app.getPath('userData');
     throw new Error(
       'TRADING212_API_KEY environment variable not set!\n\n' +
-      'Please create a .env file by:\n' +
-      '1. Copy .env.example to .env\n' +
-      '2. Fill in your Trading 212 API key and secret\n\n' +
-      'Or set the environment variables directly.'
+      `Please create a .env file at:\n${envPath}\n\n` +
+      'With contents:\n' +
+      'TRADING212_API_KEY=your_key_here\n' +
+      'TRADING212_API_SECRET=your_secret_here\n' +
+      'TRADING212_ENVIRONMENT=live'
     );
   }
   if (!apiSecret) {
     throw new Error(
       'TRADING212_API_SECRET environment variable not set!\n\n' +
-      'Please create a .env file by:\n' +
-      '1. Copy .env.example to .env\n' +
-      '2. Fill in your Trading 212 API key and secret\n\n' +
-      'Or set the environment variables directly.'
+      `Please create a .env file at:\n${envPath}\n\n` +
+      'With contents:\n' +
+      'TRADING212_API_KEY=your_key_here\n' +
+      'TRADING212_API_SECRET=your_secret_here\n' +
+      'TRADING212_ENVIRONMENT=live'
     );
   }
 
@@ -417,7 +430,6 @@ async function initialize() {
     console.error('[Main] Initialization failed:', error.message);
 
     // Show error dialog
-    const { dialog } = require('electron');
     dialog.showErrorBox('Startup Error', error.message);
 
     app.quit();
@@ -426,11 +438,79 @@ async function initialize() {
 
 
 // =============================================================================
+// AUTO-UPDATER
+// =============================================================================
+//
+// Checks for updates from GitHub Releases and prompts user to install.
+// Updates are downloaded in the background and installed on next restart.
+
+/**
+ * Set up auto-updater event handlers
+ */
+function setupAutoUpdater() {
+  // Don't check for updates in development
+  if (isDev) {
+    console.log('[Updater] Skipping update check in development mode');
+    return;
+  }
+
+  // Log update events
+  autoUpdater.on('checking-for-update', () => {
+    console.log('[Updater] Checking for updates...');
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('[Updater] Update available:', info.version);
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Update Available',
+      message: `A new version (${info.version}) is available.`,
+      detail: 'It will be downloaded in the background. You will be notified when it is ready to install.',
+      buttons: ['OK']
+    });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    console.log('[Updater] No updates available');
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    console.log(`[Updater] Download progress: ${Math.round(progress.percent)}%`);
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('[Updater] Update downloaded:', info.version);
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Update Ready',
+      message: `Version ${info.version} has been downloaded.`,
+      detail: 'Restart the application to apply the update.',
+      buttons: ['Restart Now', 'Later']
+    }).then((result) => {
+      if (result.response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    });
+  });
+
+  autoUpdater.on('error', (error) => {
+    console.error('[Updater] Error:', error.message);
+  });
+
+  // Check for updates (silently, don't bother user if no update)
+  autoUpdater.checkForUpdatesAndNotify();
+}
+
+
+// =============================================================================
 // ELECTRON APP EVENTS
 // =============================================================================
 
 // Called when Electron has finished initialization
-app.whenReady().then(initialize);
+app.whenReady().then(async () => {
+  await initialize();
+  setupAutoUpdater();
+});
 
 // Quit when all windows are closed (except on macOS)
 app.on('window-all-closed', () => {
