@@ -212,8 +212,9 @@ function sortPositions(positions) {
         break;
 
       case 'ppl':
-        aValue = a.ppl || 0;
-        bValue = b.ppl || 0;
+        // Normalize P/L for UK stocks when sorting
+        aValue = normalizePriceToGbp(a.ppl, a.ticker) || 0;
+        bValue = normalizePriceToGbp(b.ppl, b.ticker) || 0;
         break;
 
       case 'currentValue':
@@ -335,8 +336,11 @@ function renderPositions() {
       const curPrice = normalizePriceToGbp(pos.currentPrice, pos.ticker);
       const currentValue = pos.quantity * curPrice;
 
+      // P/L also needs normalization for UK stocks (API returns pence)
+      const ppl = normalizePriceToGbp(pos.ppl, pos.ticker);
+
       const dailyChangeClass = getChangeClass(pos.dailyChangePercent);
-      const pplClass = getChangeClass(pos.ppl);
+      const pplClass = getChangeClass(ppl);
 
       // Format daily change display
       let dailyChangeDisplay = '--';
@@ -364,7 +368,7 @@ function renderPositions() {
           <td class="number">${formatCurrency(currentValue)}</td>
           <td class="number">${dailyChangeDisplay}</td>
           <td class="number">
-            <span class="${pplClass}">${formatCurrency(pos.ppl)}</span>
+            <span class="${pplClass}">${formatCurrency(ppl)}</span>
           </td>
         </tr>
       `;
