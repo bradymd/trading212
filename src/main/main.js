@@ -641,35 +641,6 @@ function setupAutoUpdater() {
 
 
 // =============================================================================
-// CHROME/ELECTRON COMMAND-LINE SWITCHES
-// =============================================================================
-
-/**
- * Disable sandbox if needed for compatibility with older Linux systems
- *
- * Some Linux systems don't support user namespaces or have other kernel
- * limitations that prevent Chromium's sandbox from working. This detects
- * those cases and automatically disables the sandbox.
- *
- * Note: Disabling the sandbox reduces security, but is necessary for
- * compatibility on some systems.
- */
-if (process.platform === 'linux') {
-  // Check if we should disable sandbox
-  // This happens automatically if:
-  // - User namespaces are not available
-  // - Running on older kernel versions
-  // The app will try to start with sandbox, and if it fails,
-  // the user would need to use --no-sandbox flag.
-  //
-  // To avoid that hassle, we disable it automatically on Linux
-  // since this is a read-only viewer app with minimal security risk
-  app.commandLine.appendSwitch('no-sandbox');
-  console.log('[Main] Sandbox disabled for Linux compatibility');
-}
-
-
-// =============================================================================
 // ELECTRON APP EVENTS
 // =============================================================================
 
