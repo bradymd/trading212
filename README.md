@@ -10,13 +10,50 @@ A **read-only** desktop application for viewing your Trading 212 portfolio.
 
 ## Quick Install (Linux)
 
-Download and run the latest AppImage:
+Two installation options are available. Choose based on your needs:
+
+### Option 1: Debian Package (.deb) - **Recommended**
+
+✅ Best choice for proper system integration with icon support
 
 ```bash
+# Download and install
+curl -L https://github.com/bradymd/trading212/releases/latest/download/trading212-viewer_1.0.8_amd64.deb -o trading212-viewer.deb
+sudo dpkg -i trading212-viewer.deb
+
+# Launch from application menu or command line
+trading212-viewer
+```
+
+**Benefits:**
+- Proper icon integration in application launcher and taskbar
+- Appears in system application menu
+- Clean installation with `dpkg`/`apt`
+- Auto-updates supported (beta)
+
+**To uninstall:**
+```bash
+sudo apt remove trading212-viewer
+```
+
+### Option 2: AppImage - Portable
+
+✅ Best choice for portability or systems without package manager access
+
+```bash
+# Download and run
 curl -L https://github.com/bradymd/trading212/releases/latest/download/Trading212-Viewer.AppImage -o Trading212-Viewer.AppImage
 chmod +x Trading212-Viewer.AppImage
 ./Trading212-Viewer.AppImage
 ```
+
+**Benefits:**
+- No installation required
+- Portable (can run from USB stick)
+- Works on any Linux distribution
+- Auto-updates supported
+
+**Note:** AppImages have limited system integration, so the icon may not display properly in your taskbar or launcher.
 
 ## Setup
 
@@ -139,6 +176,30 @@ Daily change calculation requires yesterday's data. The app tracks history from 
 
 Trading 212 API has rate limits. The app caches data to minimise API calls. If you see rate limit errors, wait a few minutes before refreshing.
 
+### AppImage requires --no-sandbox flag
+
+If you get sandbox-related errors on older systems, you can either:
+
+**Option 1: Switch to .deb package** (recommended)
+```bash
+sudo dpkg -i trading212-viewer_1.0.8_amd64.deb
+```
+
+**Option 2: Disable sandbox for AppImage**
+```bash
+# Create a launcher script
+cat > launch-trading212.sh << 'EOF'
+#!/bin/sh
+export ELECTRON_DISABLE_SANDBOX=1
+exec ./Trading212-Viewer.AppImage "$@"
+EOF
+
+chmod +x launch-trading212.sh
+./launch-trading212.sh
+```
+
+The .deb package is recommended as it integrates better with the system.
+
 ---
 
 ## For Developers
@@ -160,8 +221,11 @@ npm run dev
 # Or run normally
 npm start
 
-# Build AppImage
+# Build AppImage only
 npm run build
+
+# Build both AppImage and .deb package
+npm run build:all
 ```
 
 When running from source, the app looks for `.env` in the project root (not `~/.config`).

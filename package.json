@@ -8,7 +8,7 @@
     "dev": "NODE_ENV=development electron .",
     "build": "electron-builder --linux AppImage",
     "build:all": "electron-builder --linux AppImage deb",
-    "release": "electron-builder --linux AppImage --publish always"
+    "release": "electron-builder --linux AppImage deb --publish always"
   },
   "keywords": [
     "trading212",
@@ -17,7 +17,10 @@
     "isa",
     "electron"
   ],
-  "author": "bradymd",
+  "author": {
+    "name": "bradymd",
+    "email": "brady@example.com"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -37,10 +40,16 @@
     "productName": "Trading 212 Viewer",
     "linux": {
       "target": [
-        "AppImage"
+        "AppImage",
+        "deb"
       ],
       "category": "Finance",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "desktop": {
+        "Name": "Trading 212 Viewer",
+        "Comment": "View your Trading 212 Invest & ISA portfolio",
+        "Categories": "Office;Finance;"
+      }
     },
     "appImage": {
       "artifactName": "Trading212-Viewer.${ext}"
