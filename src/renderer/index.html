@@ -33,7 +33,10 @@
   <!-- HEADER -->
   <!-- =================================================================== -->
   <header class="app-header">
-    <h1>Trading 212 Portfolio</h1>
+    <div class="header-title">
+      <h1>Trading 212 Portfolio</h1>
+      <div class="header-subtitle">Invest & ISA Accounts</div>
+    </div>
     <div class="header-actions">
       <span id="last-update" class="last-update">Last update: --</span>
       <button id="refresh-btn" class="btn btn-primary">
@@ -101,8 +104,10 @@
       <div class="table-controls">
         <label for="sort-select">Sort by:</label>
         <select id="sort-select">
-          <option value="dailyChangePercent-asc">Daily Change % (Losers first)</option>
-          <option value="dailyChangePercent-desc">Daily Change % (Gainers first)</option>
+          <option value="totalReturnPercent-asc" selected>Total Return % (Losers first)</option>
+          <option value="totalReturnPercent-desc">Total Return % (Gainers first)</option>
+          <option value="dailyChangePercent-asc" class="daily-change-option">Daily Change % (Losers first)</option>
+          <option value="dailyChangePercent-desc" class="daily-change-option">Daily Change % (Gainers first)</option>
           <option value="ppl-asc">Total P/L (Losers first)</option>
           <option value="ppl-desc">Total P/L (Gainers first)</option>
           <option value="currentValue-desc">Value (Highest first)</option>
@@ -119,7 +124,8 @@
               <th class="number">Avg Price</th>
               <th class="number">Current Price</th>
               <th class="number">Current Value</th>
-              <th class="number">Daily Change</th>
+              <th class="number">Total Return</th>
+              <th id="daily-change-header" class="number">Daily Change</th>
               <th class="number">Total P/L</th>
             </tr>
           </thead>
@@ -158,7 +164,7 @@
   <!-- FOOTER -->
   <!-- =================================================================== -->
   <footer class="app-footer">
-    <p>Trading 212 Portfolio Viewer • Read-Only • Data refreshes automatically</p>
+    <p>Trading 212 Portfolio Viewer • Read-Only • Supports Invest & ISA Accounts</p>
   </footer>
 
 

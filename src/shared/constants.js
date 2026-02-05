@@ -77,8 +77,9 @@ const IPC_CHANNELS = {
 
 const DEFAULTS = {
   // How often to poll the API (in milliseconds)
-  // 60000ms = 1 minute (reasonable to avoid rate limits)
-  POLLING_INTERVAL_MS: 60000,
+  // 3600000ms = 1 hour (conservative to avoid rate limits)
+  // Trading 212 has strict rate limits - don't poll too frequently
+  POLLING_INTERVAL_MS: 3600000,
 
   // Default alert thresholds (percentage)
   DAILY_LOSS_ALERT_THRESHOLD: -5,   // Alert if a stock drops 5% in a day

@@ -43,7 +43,7 @@ const state = {
   downtrends: [],
 
   // Sorting preference
-  sortBy: 'dailyChangePercent',
+  sortBy: 'totalReturnPercent',
   sortDirection: 'asc', // 'asc' = losers first
 
   // Last update timestamp
@@ -69,6 +69,7 @@ const elements = {
   positionsBody: document.getElementById('positions-body'),
   positionCount: document.getElementById('position-count'),
   sortSelect: document.getElementById('sort-select'),
+  dailyChangeHeader: document.getElementById('daily-change-header'),
 
   // Alerts
   alertsContainer: document.getElementById('alerts-container'),
@@ -95,22 +96,15 @@ const elements = {
  * Check if a position is priced in pence (GBX) rather than pounds (GBP)
  *
  * UK stocks trade in GBX (pence), so prices need to be divided by 100.
- * We check the instrument currency code first (most reliable), then fall
- * back to ticker pattern matching.
+ * ONLY use the instrument currency code - ticker patterns are unreliable
+ * (e.g., "BNKEl" is a European ETF, not a UK stock, despite ending in 'l')
  *
- * @param {Object} position - Position object with instrumentCurrency and ticker
+ * @param {Object} position - Position object with instrumentCurrency
  * @returns {boolean} True if priced in pence
  */
 function isPricedInPence(position) {
-  // Best method: check the instrument currency code
-  if (position?.instrumentCurrency === 'GBX') {
-    return true;
-  }
-  // Fallback: check ticker pattern (London stocks end in lowercase 'l_EQ')
-  if (position?.ticker?.endsWith('l_EQ')) {
-    return true;
-  }
-  return false;
+  // Only trust the instrument currency code
+  return position?.instrumentCurrency === 'GBX';
 }
 
 
@@ -217,10 +211,20 @@ function sortPositions(positions) {
         bValue = b.dailyChangePercent || 0;
         break;
 
+      case 'totalReturnPercent':
+        // Calculate total return % from purchase price
+        aValue = a.averagePrice > 0
+          ? ((normalizePriceToGbp(a.currentPrice, a) - normalizePriceToGbp(a.averagePrice, a)) / normalizePriceToGbp(a.averagePrice, a)) * 100
+          : 0;
+        bValue = b.averagePrice > 0
+          ? ((normalizePriceToGbp(b.currentPrice, b) - normalizePriceToGbp(b.averagePrice, b)) / normalizePriceToGbp(b.averagePrice, b)) * 100
+          : 0;
+        break;
+
       case 'ppl':
-        // Normalize P/L for UK stocks when sorting
-        aValue = normalizePriceToGbp(a.ppl, a) || 0;
-        bValue = normalizePriceToGbp(b.ppl, b) || 0;
+        // P/L is already in account currency (GBP), no normalization needed
+        aValue = a.ppl || 0;
+        bValue = b.ppl || 0;
         break;
 
       case 'currentValue':
@@ -325,6 +329,32 @@ function renderPositions() {
   // Update position count badge
   elements.positionCount.textContent = positions.length;
 
+  // Check if we have any yesterday data
+  const hasYesterdayData = positions.some(pos => pos.hasYesterdayData);
+
+  // Update daily change options styling and text
+  const dailyChangeOptions = document.querySelectorAll('.daily-change-option');
+  dailyChangeOptions.forEach(option => {
+    if (!hasYesterdayData && positions.length > 0) {
+      option.classList.add('unavailable');
+      if (!option.textContent.includes('(no data yet)')) {
+        option.textContent = option.textContent + ' (no data yet)';
+      }
+    } else {
+      option.classList.remove('unavailable');
+      option.textContent = option.textContent.replace(' (no data yet)', '');
+    }
+  });
+
+  // Update header styling and tooltip (no banner, just subtle indicators)
+  if (!hasYesterdayData && positions.length > 0) {
+    elements.dailyChangeHeader.style.color = 'var(--color-warning)';
+    elements.dailyChangeHeader.title = 'Daily change data will appear after 24 hours of tracking';
+  } else {
+    elements.dailyChangeHeader.style.color = '';
+    elements.dailyChangeHeader.title = '';
+  }
+
   // Build table HTML
   // (Using innerHTML for simplicity; for large lists, consider virtual scrolling)
   let html = '';
@@ -332,18 +362,38 @@ function renderPositions() {
   if (positions.length === 0) {
     html = `
       <tr class="loading-row">
-        <td colspan="7">No positions found. Check your API configuration.</td>
+        <td colspan="8">No positions found. Check your API configuration.</td>
       </tr>
     `;
   } else {
     for (const pos of positions) {
+      // Debug specific tickers
+      if (pos.shortTicker === 'BNKEI' || pos.shortTicker === 'BNKEIl' || pos.shortTicker === 'VUKGl') {
+        console.log(`[Renderer] ${pos.shortTicker}:`, {
+          ticker: pos.ticker,
+          instrumentCurrency: pos.instrumentCurrency,
+          isPence: isPricedInPence(pos),
+          averagePrice_raw: pos.averagePrice,
+          currentPrice_raw: pos.currentPrice,
+          quantity: pos.quantity,
+          ppl_raw: pos.ppl
+        });
+      }
+
       // Normalize prices from pence to pounds for UK stocks
       const avgPrice = normalizePriceToGbp(pos.averagePrice, pos);
       const curPrice = normalizePriceToGbp(pos.currentPrice, pos);
       const currentValue = pos.quantity * curPrice;
 
-      // P/L also needs normalization for UK stocks (API returns pence)
-      const ppl = normalizePriceToGbp(pos.ppl, pos);
+      // P/L is already in account currency (GBP), don't normalize it
+      // (API returns prices in pence for UK stocks, but P/L is always in GBP)
+      const ppl = pos.ppl || 0;
+
+      // Calculate total return % since purchase
+      const totalReturnPercent = avgPrice > 0
+        ? ((curPrice - avgPrice) / avgPrice) * 100
+        : 0;
+      const totalReturnClass = getChangeClass(totalReturnPercent);
 
       const dailyChangeClass = getChangeClass(pos.dailyChangePercent);
       const pplClass = getChangeClass(ppl);
@@ -361,17 +411,27 @@ function renderPositions() {
         `;
       }
 
-      // Show company name on hover (title attribute)
+      // Display ticker and company name
       const tickerDisplay = pos.shortTicker || pos.ticker;
-      const hoverTitle = pos.companyName || pos.ticker;
+      const companyName = pos.companyName || '';
+      const hoverTitle = companyName || pos.ticker;
+
+      // Build ticker cell content
+      let tickerCellContent = '<div class="ticker-display">' + tickerDisplay + '</div>';
+      if (companyName) {
+        tickerCellContent += '<div class="company-name">' + companyName + '</div>';
+      }
 
       html += `
         <tr>
-          <td class="ticker-cell" title="${hoverTitle}">${tickerDisplay}</td>
+          <td class="ticker-cell" title="${hoverTitle}">${tickerCellContent}</td>
           <td>${pos.quantity.toFixed(4)}</td>
           <td class="number">${formatCurrency(avgPrice)}</td>
           <td class="number">${formatCurrency(curPrice)}</td>
           <td class="number">${formatCurrency(currentValue)}</td>
+          <td class="number">
+            <span class="${totalReturnClass}">${formatPercent(totalReturnPercent)}</span>
+          </td>
           <td class="number">${dailyChangeDisplay}</td>
           <td class="number">
             <span class="${pplClass}">${formatCurrency(ppl)}</span>
@@ -455,10 +515,12 @@ function renderDowntrends(downtrends) {
  * Update the "last update" timestamp display
  *
  * @param {string} timestamp - ISO timestamp string
+ * @param {boolean} fromCache - Whether this data is from cache
  */
-function updateLastUpdateTime(timestamp) {
+function updateLastUpdateTime(timestamp, fromCache = false) {
   state.lastUpdate = timestamp;
-  elements.lastUpdate.textContent = `Last update: ${formatTime(timestamp)}`;
+  const cacheIndicator = fromCache ? ' (cached)' : '';
+  elements.lastUpdate.textContent = `Last update: ${formatTime(timestamp)}${cacheIndicator}`;
 }
 
 
@@ -506,7 +568,7 @@ function handlePositionsUpdate(data) {
   renderPositions();
   renderAlerts(state.alerts);
   renderDowntrends(state.downtrends);
-  updateLastUpdateTime(data.lastUpdate);
+  updateLastUpdateTime(data.lastUpdate, data.fromCache);
 
   // Clear any previous errors
   hideError();
@@ -541,11 +603,12 @@ function onRefreshClick() {
   // Request refresh from main process
   window.api.requestRefresh();
 
-  // Re-enable button after a short delay
+  // Re-enable button after a longer delay to prevent rate limiting
+  // Trading 212 API has rate limits - don't spam refresh!
   setTimeout(() => {
     elements.refreshBtn.disabled = false;
     elements.refreshBtn.textContent = '↻ Refresh';
-  }, 2000);
+  }, 5000); // 5 seconds cooldown (was 2)
 }
 
 
@@ -568,7 +631,7 @@ function initialize() {
   elements.sortSelect.addEventListener('change', onSortChange);
   elements.errorDismiss.addEventListener('click', hideError);
 
-  // Request initial data
+  // Request initial data (main process will use cache if available)
   window.api.requestPositions();
 
   console.log('[Renderer] Initialized and ready');

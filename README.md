@@ -1,6 +1,12 @@
 # Trading 212 Portfolio Viewer
 
-A **read-only** desktop application for viewing your Trading 212 Stocks & Shares ISA portfolio.
+A **read-only** desktop application for viewing your Trading 212 portfolio.
+
+**Supported account types:**
+- ✅ **Invest** (General Investment Account)
+- ✅ **ISA** (Stocks & Shares ISA)
+- ❌ **CFD** (Not supported - different API)
+- ❌ **Cash ISA** (Not supported - different API)
 
 ## Quick Install (Linux)
 
@@ -123,7 +129,7 @@ Create the `.env` file at `~/.config/trading212-viewer/.env` with your credentia
 - Check your API key and secret are correct
 - Ensure your Trading 212 account has API access enabled
 - If using IP restriction, check you're connecting from the allowed IP
-- The API only works with Invest and Stocks & Shares ISA accounts (not CFD)
+- **Important**: The API only works with **Invest** and **ISA** accounts. CFD and Cash ISA accounts are not supported.
 
 ### No daily change data showing
 

@@ -10,5 +10,10 @@
     "_comment": "Threshold percentages for alerts. Set to null to disable.",
     "dailyLossThreshold": -5,
     "dailyGainThreshold": 10
+  },
+
+  "account": {
+    "_comment": "Optional: Your total net deposits (deposits - withdrawals) in GBP. If specified, P/L will be calculated as: (Total Value - Total Deposits). This matches the Trading 212 app's P/L calculation. If not specified, uses API's invested amount (cost basis of current positions only).",
+    "totalDeposits": 20000
   }
 }

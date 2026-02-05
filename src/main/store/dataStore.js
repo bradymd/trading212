@@ -38,6 +38,9 @@ class DataStore {
         // Last known positions (for comparison)
         lastPositions: [],
 
+        // Last known cash balance (for startup cache)
+        lastCash: null,
+
         // When we last fetched data
         lastFetchTime: null,
 
@@ -48,8 +51,8 @@ class DataStore {
 
         // User preferences
         preferences: {
-          sortBy: 'dailyChangePercent', // Default sort column
-          sortDirection: 'asc'          // Losers at top by default
+          sortBy: 'totalReturnPercent', // Default sort column
+          sortDirection: 'asc'           // Losers at top by default
         }
       }
     });
@@ -131,6 +134,49 @@ class DataStore {
    */
   getAllSnapshots() {
     return this.store.get('snapshots');
+  }
+
+
+  /**
+   * Get today's snapshot (for cache checking)
+   *
+   * @returns {Object|null} Today's snapshot or null if not available
+   */
+  getTodaySnapshot() {
+    const today = this._getTodayKey();
+    const snapshots = this.store.get('snapshots');
+    return snapshots[today] || null;
+  }
+
+
+  /**
+   * Check if we have fresh data (fetched recently)
+   *
+   * @param {number} maxAgeMinutes - Maximum age in minutes (default: 30)
+   * @returns {boolean} True if we have fresh data
+   */
+  hasFreshData(maxAgeMinutes = 30) {
+    const lastFetchTime = this.store.get('lastFetchTime');
+    if (!lastFetchTime) {
+      return false;
+    }
+
+    const lastFetch = new Date(lastFetchTime);
+    const now = new Date();
+    const ageMinutes = (now - lastFetch) / (1000 * 60);
+
+    return ageMinutes < maxAgeMinutes;
+  }
+
+
+  /**
+   * Get cached positions (from today's snapshot)
+   *
+   * @returns {Array|null} Cached positions or null if not available
+   */
+  getCachedPositions() {
+    const todaySnapshot = this.getTodaySnapshot();
+    return todaySnapshot ? todaySnapshot.positions : null;
   }
 
 

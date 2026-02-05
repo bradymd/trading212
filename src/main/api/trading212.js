@@ -80,9 +80,33 @@ class Trading212Client {
         }
       });
 
+      // Log rate limit headers for debugging
+      const rateLimit = {
+        limit: response.headers.get('x-ratelimit-limit'),
+        remaining: response.headers.get('x-ratelimit-remaining'),
+        reset: response.headers.get('x-ratelimit-reset'),
+        period: response.headers.get('x-ratelimit-period')
+      };
+
+      if (rateLimit.limit) {
+        console.log(`[API] Rate Limit for ${endpoint}: ${rateLimit.remaining}/${rateLimit.limit} remaining (resets in ${rateLimit.period}s)`);
+      }
+
       // Check for HTTP errors
       if (!response.ok) {
         const errorBody = await response.text();
+
+        // Provide helpful message for rate limiting
+        if (response.status === 429) {
+          const resetTime = rateLimit.reset ? new Date(parseInt(rateLimit.reset) * 1000).toLocaleTimeString() : 'unknown';
+          throw new Error(
+            `API rate limit exceeded for ${endpoint}\n` +
+            `Limit resets at: ${resetTime}\n` +
+            `Please wait before refreshing again.\n\n` +
+            `Response: ${errorBody}`
+          );
+        }
+
         throw new Error(
           `API request failed: ${response.status} ${response.statusText}\n` +
           `Endpoint: ${endpoint}\n` +
@@ -169,6 +193,20 @@ class Trading212Client {
    */
   async getDividends(limit = 50) {
     return await this._get(`${API_ENDPOINTS.DIVIDENDS}?limit=${limit}`);
+  }
+
+
+  /**
+   * Get transaction history (deposits, withdrawals, transfers)
+   *
+   * Returns array of transactions.
+   * This can be used to calculate net deposits.
+   *
+   * @param {number} limit - Maximum number of records to return (default: 50)
+   * @returns {Promise<Array>} Array of transaction records
+   */
+  async getTransactions(limit = 50) {
+    return await this._get(`${API_ENDPOINTS.TRANSACTIONS}?limit=${limit}`);
   }
 
 

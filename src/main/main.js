@@ -150,11 +150,22 @@ function loadConfig() {
     alerts: {
       dailyLossThreshold: -5,
       dailyGainThreshold: 10
+    },
+    account: {
+      // Optional: Total deposits (for accurate P/L calculation)
+      // If not specified, will use API's invested amount
+      totalDeposits: null
     }
   };
 
   // Optionally load additional settings from config file
-  const configPath = path.join(__dirname, '../../config/config.json');
+  // Use the same directory as .env file for consistency
+  const configPath = isDev
+    ? path.join(__dirname, '../../config/config.json')
+    : path.join(app.getPath('userData'), 'config.json');
+
+  console.log(`[Main] Looking for config at: ${configPath}`);
+
   if (fs.existsSync(configPath)) {
     try {
       const configContent = fs.readFileSync(configPath, 'utf-8');
@@ -169,6 +180,9 @@ function loadConfig() {
       }
       if (fileConfig.alerts?.dailyGainThreshold !== undefined) {
         config.alerts.dailyGainThreshold = fileConfig.alerts.dailyGainThreshold;
+      }
+      if (fileConfig.account?.totalDeposits !== undefined) {
+        config.account.totalDeposits = fileConfig.account.totalDeposits;
       }
 
       console.log('[Main] Loaded additional settings from config.json');
@@ -308,6 +322,87 @@ function setupMenu() {
 // =============================================================================
 
 /**
+ * Load data from cache if available and fresh
+ *
+ * @param {number} maxAgeMinutes - Maximum cache age in minutes
+ * @returns {boolean} True if cache was loaded successfully
+ */
+async function loadFromCache(maxAgeMinutes = 30) {
+  try {
+    if (!dataStore.hasFreshData(maxAgeMinutes)) {
+      console.log('[Main] No fresh cached data available');
+      return false;
+    }
+
+    const cachedPositions = dataStore.getCachedPositions();
+    const cachedCash = dataStore.store.get('lastCash');
+
+    if (!cachedPositions || !cachedCash) {
+      console.log('[Main] Cache incomplete');
+      return false;
+    }
+
+    const lastFetchTime = dataStore.store.get('lastFetchTime');
+    console.log(`[Main] Using cached data (${cachedPositions.length} positions) from ${lastFetchTime}`);
+
+    // Apply deposit config override to cached cash data if configured
+    if (config.account?.totalDeposits) {
+      const totalDeposits = config.account.totalDeposits;
+      const truePnl = cachedCash.total - totalDeposits;
+
+      cachedCash.invested = totalDeposits - cachedCash.free;
+      cachedCash.ppl = truePnl;
+    }
+
+    // Ensure instruments metadata is loaded for company names
+    if (!instrumentsMap) {
+      // Try loading from disk cache first
+      if (dataStore.isInstrumentsCacheValid()) {
+        console.log('[Main] Loading instruments from disk cache...');
+        instrumentsMap = dataStore.getCachedInstruments();
+        if (instrumentsMap) {
+          console.log(`[Main] Loaded ${instrumentsMap.size} instruments from disk cache`);
+        }
+      }
+    }
+
+    // Process cached data same way as fresh API data
+    const positionsWithNames = cachedPositions.map(pos => {
+      const meta = instrumentsMap?.get(pos.ticker);
+      return {
+        ...pos,
+        companyName: meta?.name || null,
+        instrumentCurrency: meta?.currencyCode || null
+      };
+    });
+
+    console.log('[Main] Sample position with name:', positionsWithNames[0]?.ticker, '->', positionsWithNames[0]?.companyName);
+
+    const positionsWithChanges = dataStore.calculateDailyChanges(positionsWithNames);
+    const downtrends = dataStore.detectDowntrends(5, -10);
+    const alerts = alertManager.checkAlerts(positionsWithChanges);
+
+    // Send cached data to renderer with correct timestamp
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC_CHANNELS.POSITIONS_UPDATE, {
+        positions: positionsWithChanges,
+        cash: cachedCash,
+        alerts,
+        downtrends,
+        lastUpdate: lastFetchTime,
+        fromCache: true  // Flag to indicate this is cached data
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.error('[Main] Error loading from cache:', error.message);
+    return false;
+  }
+}
+
+
+/**
  * Fetch latest data from Trading 212 and update the UI
  *
  * This is the main data refresh function. It:
@@ -324,6 +419,27 @@ async function refreshData() {
     // Fetch current positions and cash
     const positions = await apiClient.getPositions();
     const cash = await apiClient.getCashBalance();
+
+    // Debug: Log what the API actually returns
+    console.log('[Main] API Cash Response:', JSON.stringify(cash, null, 2));
+
+    // If user configured total deposits, calculate true P/L
+    // Otherwise use API's invested/ppl values
+    if (config.account?.totalDeposits) {
+      const totalDeposits = config.account.totalDeposits;
+      const truePnl = cash.total - totalDeposits;
+      const truePnlPercent = totalDeposits > 0 ? (truePnl / totalDeposits) * 100 : 0;
+
+      console.log(`[Main] Using configured deposits: £${totalDeposits}`);
+      console.log(`[Main] True P/L: £${truePnl.toFixed(2)} (${truePnlPercent.toFixed(2)}%)`);
+
+      // Override API values with calculated true values
+      cash.invested = totalDeposits - cash.free;  // Deposits minus cash = invested
+      cash.ppl = truePnl;
+    }
+
+    // Cache the cash data for next startup
+    dataStore.store.set('lastCash', cash);
 
     // Fetch instruments metadata if not cached (for company names)
     // First check disk cache, then memory, then API
@@ -391,7 +507,8 @@ async function refreshData() {
         cash,
         alerts,
         downtrends,
-        lastUpdate: new Date().toISOString()
+        lastUpdate: new Date().toISOString(),
+        fromCache: false  // This is fresh API data
       });
     }
 
@@ -461,8 +578,16 @@ function setupIpcHandlers() {
 
   // Handle request for initial data load
   ipcMain.on(IPC_CHANNELS.REQUEST_POSITIONS, async () => {
-    console.log('[Main] Positions requested');
-    await refreshData();
+    console.log('[Main] Positions requested by renderer');
+
+    // Try loading from cache first (if fresh within 30 min)
+    const cacheLoaded = await loadFromCache(30);
+
+    if (!cacheLoaded) {
+      // Cache not available or stale - fetch from API
+      console.log('[Main] No cache available, fetching from API');
+      await refreshData();
+    }
   });
 
   // Handle request for account summary
@@ -516,24 +641,9 @@ async function initialize() {
     // Create the window first - we want to show UI even if API fails
     createWindow();
 
-    // Try to fetch initial data, but don't quit if it fails
-    // (No connection test - we'll just try to fetch data directly to save an API call)
-    try {
-      // Do initial data fetch
-      await refreshData();
-    } catch (apiError) {
-      console.error('[Main] Initial API call failed:', apiError.message);
-
-      // Send error to renderer so user sees it in the UI
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.on('did-finish-load', () => {
-          mainWindow.webContents.send(IPC_CHANNELS.ERROR, {
-            message: `Could not load data: ${apiError.message}\n\nClick Refresh to try again.`,
-            timestamp: new Date().toISOString()
-          });
-        });
-      }
-    }
+    // Don't load initial data here - let renderer request it when ready
+    // This ensures IPC handlers are set up before data is sent
+    console.log('[Main] Window created, waiting for renderer to request data');
 
     // Start polling for updates (will retry periodically)
     startPolling();
