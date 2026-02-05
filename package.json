@@ -1,6 +1,6 @@
 {
   "name": "trading212-viewer",
-  "version": "1.0.9",
+  "version": "1.1.0",
   "description": "Read-only portfolio viewer for Trading 212 Invest & ISA accounts",
   "main": "src/main/main.js",
   "scripts": {

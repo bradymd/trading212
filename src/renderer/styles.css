@@ -115,6 +115,72 @@ body {
   font-size: 0.85rem;
 }
 
+/* Search bar */
+.search-wrapper {
+  position: relative;
+}
+
+.search-input {
+  background-color: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  width: 220px;
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: var(--color-accent);
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 200;
+  box-shadow: var(--shadow-card);
+}
+
+.search-result-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.search-result-item:hover,
+.search-result-item.active {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.search-result-ticker {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.search-result-name {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  margin-top: 1px;
+}
+
 
 /* ==========================================================================
    BUTTONS
@@ -298,8 +364,86 @@ body {
   border-color: var(--color-accent);
 }
 
+.controls-spacer {
+  flex: 1;
+}
+
+.btn-panel-toggle {
+  background-color: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.btn-panel-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.btn-panel-toggle.active {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border-color: var(--color-accent);
+}
+
+.btn-panel-toggle .count-badge {
+  font-size: 0.75rem;
+}
+
+/* Popup panels for alerts and downtrends */
+.popup-panel {
+  background-color: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-md);
+  box-shadow: var(--shadow-card);
+  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.popup-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.popup-panel-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.popup-panel-close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.popup-panel-close:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.popup-panel-body {
+  overflow-y: auto;
+  padding: var(--spacing-sm) 0;
+}
+
 .table-container {
-  overflow-x: auto;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
 }
@@ -324,11 +468,18 @@ body {
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .positions-table th.number,
 .positions-table td.number {
   text-align: right;
+}
+
+.positions-table tbody tr {
+  scroll-margin-top: 50px;
 }
 
 .positions-table tbody tr:hover {
@@ -369,6 +520,13 @@ body {
   white-space: nowrap;
 }
 
+/* GBP equivalent display for non-GBP stocks */
+.gbp-equivalent {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: normal;
+}
+
 /* Gain/Loss coloring */
 .gain {
   color: var(--color-gain);
@@ -386,10 +544,6 @@ body {
 /* ==========================================================================
    ALERTS SECTION
    ========================================================================== */
-
-.alerts-section {
-  margin-bottom: var(--spacing-xl);
-}
 
 .alerts-section h2 {
   font-size: 1.1rem;
@@ -424,6 +578,33 @@ body {
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+/* Clickable items in alerts and downtrends */
+.clickable {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.clickable:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Inline company name for alerts and downtrends */
+.company-name-inline {
+  color: var(--text-secondary);
+  font-weight: normal;
+  font-size: 0.85rem;
+}
+
+/* Row highlight animation when scrolled to */
+.highlight-row {
+  animation: row-highlight 1.5s ease-out;
+}
+
+@keyframes row-highlight {
+  0% { background-color: rgba(255, 255, 255, 0.15); }
+  100% { background-color: transparent; }
+}
+
 .alert-item:last-child {
   border-bottom: none;
 }
@@ -451,19 +632,7 @@ body {
   font-size: 0.8rem;
 }
 
-/* Downtrends */
-.downtrends-container {
-  margin-top: var(--spacing-md);
-  background-color: rgba(255, 193, 7, 0.1);
-  border: 1px solid var(--color-warning);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-md);
-}
-
-.downtrends-container.hidden {
-  display: none;
-}
-
+/* Downtrends (inside popup panel) */
 .downtrends-container h3 {
   font-size: 1rem;
   color: var(--color-warning);

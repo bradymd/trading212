@@ -39,8 +39,12 @@ const state = {
   // Current alerts
   alerts: [],
 
-  // Downtrend warnings
+  // Trend warnings
   downtrends: [],
+  uptrends: [],
+
+  // FX rates for GBP conversion (e.g., { USD: 1.37, EUR: 1.19 })
+  fxRates: null,
 
   // Sorting preference
   sortBy: 'totalReturnPercent',
@@ -71,15 +75,26 @@ const elements = {
   sortSelect: document.getElementById('sort-select'),
   dailyChangeHeader: document.getElementById('daily-change-header'),
 
-  // Alerts
+  // Alerts & Downtrends
   alertsContainer: document.getElementById('alerts-container'),
   alertCount: document.getElementById('alert-count'),
+  alertsBtn: document.getElementById('alerts-btn'),
+  alertsPanel: document.getElementById('alerts-panel'),
   downtrendsContainer: document.getElementById('downtrends-container'),
   downtrendsList: document.getElementById('downtrends-list'),
+  downtrendsBtn: document.getElementById('downtrends-btn'),
+  downtrendsPanel: document.getElementById('downtrends-panel'),
+  downtrendCount: document.getElementById('downtrend-count'),
+  uptrendsBtn: document.getElementById('uptrends-btn'),
+  uptrendsPanel: document.getElementById('uptrends-panel'),
+  uptrendsList: document.getElementById('uptrends-list'),
+  uptrendCount: document.getElementById('uptrend-count'),
 
   // Header
   lastUpdate: document.getElementById('last-update'),
   refreshBtn: document.getElementById('refresh-btn'),
+  searchInput: document.getElementById('search-input'),
+  searchResults: document.getElementById('search-results'),
 
   // Error handling
   errorBanner: document.getElementById('error-banner'),
@@ -157,6 +172,25 @@ function formatCurrency(value, currency = 'GBP') {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(value);
+}
+
+
+/**
+ * Format a GBP equivalent for display in brackets
+ *
+ * For non-GBP instruments, returns HTML like "(£21.22)" on a new line.
+ * For GBP/GBX instruments or if the value can't be calculated, returns ''.
+ *
+ * @param {number} gbpValue - The value already converted to GBP
+ * @param {string} instrumentCurrency - The instrument's native currency
+ * @returns {string} HTML string for the GBP equivalent, or ''
+ */
+function formatGbpEquivalent(gbpValue, instrumentCurrency) {
+  if (!instrumentCurrency) return '';
+  if (instrumentCurrency === 'GBP' || instrumentCurrency === 'GBX') return '';
+  if (gbpValue === null || gbpValue === undefined || isNaN(gbpValue)) return '';
+
+  return `<br><small class="gbp-equivalent">(${formatCurrency(gbpValue, 'GBP')})</small>`;
 }
 
 
@@ -406,6 +440,31 @@ function renderPositions() {
       // (API returns prices in pence for UK stocks, but P/L is always in GBP)
       const ppl = pos.ppl || 0;
 
+      // Calculate GBP equivalents for non-GBP stocks
+      let avgPriceGbpHtml = '';
+      let curPriceGbpHtml = '';
+      let currentValueGbpHtml = '';
+
+      const currency = pos.instrumentCurrency;
+      if (state.fxRates && currency && currency !== 'GBP' && currency !== 'GBX') {
+        const fxRate = state.fxRates[currency];
+        if (fxRate) {
+          // Current price in GBP: price / fxRate (fxRate is GBP->currency)
+          const curPriceGbp = curPrice / fxRate;
+          curPriceGbpHtml = formatGbpEquivalent(curPriceGbp, currency);
+
+          // Current value in GBP
+          const currentValueGbp = pos.quantity * curPriceGbp;
+          currentValueGbpHtml = formatGbpEquivalent(currentValueGbp, currency);
+
+          // Avg price in GBP: derived from ppl (captures historical FX rate)
+          // costBasisGBP = currentValueGBP - ppl (ppl includes FX effects)
+          const costBasisGbp = currentValueGbp - ppl;
+          const avgPriceGbp = pos.quantity > 0 ? costBasisGbp / pos.quantity : 0;
+          avgPriceGbpHtml = formatGbpEquivalent(avgPriceGbp, currency);
+        }
+      }
+
       // Calculate total return % since purchase
       const totalReturnPercent = avgPrice > 0
         ? ((curPrice - avgPrice) / avgPrice) * 100
@@ -422,10 +481,22 @@ function renderPositions() {
         const normalizedDailyChange = normalizePriceToGbp(pos.dailyChange, pos);
         const changeAmount = normalizedDailyChange * pos.quantity;
         const arrow = normalizedDailyChange > 0 ? '▲' : normalizedDailyChange < 0 ? '▼' : '';
+
+        // For non-GBP stocks, show total in GBP (portfolio impact); otherwise native currency
+        let totalChangeCurrency = displayCurrency;
+        let totalChangeAmount = changeAmount;
+        const fxRate = state.fxRates && currency && currency !== 'GBP' && currency !== 'GBX'
+          ? state.fxRates[currency]
+          : null;
+        if (fxRate) {
+          totalChangeAmount = changeAmount / fxRate;
+          totalChangeCurrency = 'GBP';
+        }
+
         dailyChangeDisplay = `
           <span class="${dailyChangeClass}">${arrow} ${formatCurrency(Math.abs(normalizedDailyChange), displayCurrency)}</span>
           <br>
-          <small class="${dailyChangeClass}">${formatCurrency(changeAmount, displayCurrency)} (${formatPercent(pos.dailyChangePercent)})</small>
+          <small class="${dailyChangeClass}">${formatCurrency(totalChangeAmount, totalChangeCurrency)} (${formatPercent(pos.dailyChangePercent)})</small>
         `;
       }
 
@@ -441,12 +512,12 @@ function renderPositions() {
       }
 
       html += `
-        <tr>
+        <tr data-ticker="${pos.ticker}">
           <td class="ticker-cell" title="${hoverTitle}">${tickerCellContent}</td>
           <td>${pos.quantity.toFixed(4)}</td>
-          <td class="number">${formatCurrency(avgPrice, displayCurrency)}</td>
-          <td class="number">${formatCurrency(curPrice, displayCurrency)}</td>
-          <td class="number">${formatCurrency(currentValue, displayCurrency)}</td>
+          <td class="number">${formatCurrency(avgPrice, displayCurrency)}${avgPriceGbpHtml}</td>
+          <td class="number">${formatCurrency(curPrice, displayCurrency)}${curPriceGbpHtml}</td>
+          <td class="number">${formatCurrency(currentValue, displayCurrency)}${currentValueGbpHtml}</td>
           <td class="number">
             <span class="${totalReturnClass}">${formatPercent(totalReturnPercent)}</span>
           </td>
@@ -476,18 +547,28 @@ function renderAlerts(alerts) {
     return;
   }
 
+  // Build a lookup for company names from current positions
+  const nameMap = new Map();
+  for (const pos of state.positions) {
+    nameMap.set(pos.ticker, pos.companyName || '');
+  }
+
   let html = '';
 
   for (const alert of alerts) {
     const icon = alert.type === 'daily_loss' ? '📉' : '📈';
     const time = formatTime(alert.timestamp);
+    const companyName = nameMap.get(alert.ticker) || '';
+    const titleDisplay = companyName
+      ? `${alert.shortTicker} <small class="company-name-inline">${companyName}</small>`
+      : alert.shortTicker;
 
     html += `
-      <div class="alert-item">
+      <div class="alert-item clickable" data-scroll-to="${alert.ticker}">
         <span class="alert-icon">${icon}</span>
         <div class="alert-content">
           <div class="alert-title ${alert.type === 'daily_loss' ? 'loss' : 'gain'}">
-            ${alert.shortTicker}
+            ${titleDisplay}
           </div>
           <div class="alert-message">${alert.message}</div>
         </div>
@@ -497,6 +578,14 @@ function renderAlerts(alerts) {
   }
 
   elements.alertsContainer.innerHTML = html;
+
+  // Add click handlers to scroll to the position row and close panel
+  elements.alertsContainer.querySelectorAll('[data-scroll-to]').forEach(el => {
+    el.addEventListener('click', () => {
+      scrollToPosition(el.dataset.scrollTo);
+      closeAllPanels();
+    });
+  });
 }
 
 
@@ -506,30 +595,34 @@ function renderAlerts(alerts) {
  * @param {Array} downtrends - Array of downtrend objects
  */
 function renderDowntrends(downtrends) {
+  // Update the badge count
+  const count = (downtrends && downtrends.length) || 0;
+  elements.downtrendCount.textContent = count;
+
   if (!downtrends || downtrends.length === 0) {
-    elements.downtrendsContainer.classList.add('hidden');
+    elements.downtrendsList.innerHTML = '<li class="no-alerts">No downtrends detected.</li>';
     return;
   }
 
-  elements.downtrendsContainer.classList.remove('hidden');
-
-  // Build a lookup from ticker to instrumentCurrency from current positions
-  const currencyMap = new Map();
+  // Build lookups from current positions
+  const posMap = new Map();
   for (const pos of state.positions) {
-    currencyMap.set(pos.ticker, getDisplayCurrency(pos.instrumentCurrency));
+    posMap.set(pos.ticker, pos);
   }
 
   let html = '';
 
   for (const trend of downtrends) {
-    const currency = currencyMap.get(trend.ticker) || 'GBP';
-    // Downtrend prices need GBX normalization too
-    const pos = state.positions.find(p => p.ticker === trend.ticker);
+    const pos = posMap.get(trend.ticker);
+    const currency = pos ? getDisplayCurrency(pos.instrumentCurrency) : 'GBP';
     const startPrice = pos ? normalizePriceToGbp(trend.startPrice, pos) : trend.startPrice;
     const endPrice = pos ? normalizePriceToGbp(trend.endPrice, pos) : trend.endPrice;
+    const companyName = pos?.companyName || '';
+    const nameDisplay = companyName ? ` <small class="company-name-inline">${companyName}</small>` : '';
+
     html += `
-      <li>
-        <strong class="loss">${trend.shortTicker}</strong>:
+      <li class="clickable" data-scroll-to="${trend.ticker}">
+        <strong class="loss">${trend.shortTicker}</strong>${nameDisplay}:
         Down ${Math.abs(trend.changePercent).toFixed(2)}% over ${trend.days} days
         (${formatCurrency(startPrice, currency)} → ${formatCurrency(endPrice, currency)})
       </li>
@@ -537,6 +630,158 @@ function renderDowntrends(downtrends) {
   }
 
   elements.downtrendsList.innerHTML = html;
+
+  // Add click handlers to scroll to the position row and close panel
+  elements.downtrendsList.querySelectorAll('[data-scroll-to]').forEach(el => {
+    el.addEventListener('click', () => {
+      scrollToPosition(el.dataset.scrollTo);
+      closeAllPanels();
+    });
+  });
+}
+
+
+/**
+ * Render uptrend warnings
+ *
+ * @param {Array} uptrends - Array of uptrend objects
+ */
+function renderUptrends(uptrends) {
+  const count = (uptrends && uptrends.length) || 0;
+  elements.uptrendCount.textContent = count;
+
+  if (!uptrends || uptrends.length === 0) {
+    elements.uptrendsList.innerHTML = '<li class="no-alerts">No uptrends detected.</li>';
+    return;
+  }
+
+  // Build lookups from current positions
+  const posMap = new Map();
+  for (const pos of state.positions) {
+    posMap.set(pos.ticker, pos);
+  }
+
+  let html = '';
+
+  for (const trend of uptrends) {
+    const pos = posMap.get(trend.ticker);
+    const currency = pos ? getDisplayCurrency(pos.instrumentCurrency) : 'GBP';
+    const startPrice = pos ? normalizePriceToGbp(trend.startPrice, pos) : trend.startPrice;
+    const endPrice = pos ? normalizePriceToGbp(trend.endPrice, pos) : trend.endPrice;
+    const companyName = pos?.companyName || '';
+    const nameDisplay = companyName ? ` <small class="company-name-inline">${companyName}</small>` : '';
+
+    html += `
+      <li class="clickable" data-scroll-to="${trend.ticker}">
+        <strong class="gain">${trend.shortTicker}</strong>${nameDisplay}:
+        Up ${trend.changePercent.toFixed(2)}% over ${trend.days} days
+        (${formatCurrency(startPrice, currency)} → ${formatCurrency(endPrice, currency)})
+      </li>
+    `;
+  }
+
+  elements.uptrendsList.innerHTML = html;
+
+  // Add click handlers to scroll to the position row and close panel
+  elements.uptrendsList.querySelectorAll('[data-scroll-to]').forEach(el => {
+    el.addEventListener('click', () => {
+      scrollToPosition(el.dataset.scrollTo);
+      closeAllPanels();
+    });
+  });
+}
+
+
+/**
+ * Close all popup panels and deactivate their toggle buttons
+ */
+function closeAllPanels() {
+  elements.alertsPanel.classList.add('hidden');
+  elements.downtrendsPanel.classList.add('hidden');
+  elements.uptrendsPanel.classList.add('hidden');
+  elements.alertsBtn.classList.remove('active');
+  elements.downtrendsBtn.classList.remove('active');
+  elements.uptrendsBtn.classList.remove('active');
+}
+
+
+/**
+ * Toggle a popup panel open/closed
+ *
+ * @param {HTMLElement} panel - The panel element to toggle
+ * @param {HTMLElement} btn - The button that triggered it
+ */
+function togglePanel(panel, btn) {
+  const isOpen = !panel.classList.contains('hidden');
+  closeAllPanels();
+  if (!isOpen) {
+    panel.classList.remove('hidden');
+    btn.classList.add('active');
+  }
+}
+
+
+/**
+ * Scroll to a position row in the table and briefly highlight it
+ *
+ * @param {string} ticker - The full ticker (e.g. "OUST_US_EQ")
+ */
+function scrollToPosition(ticker) {
+  const row = document.querySelector(`tr[data-ticker="${ticker}"]`);
+  if (!row) return;
+
+  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  row.classList.add('highlight-row');
+  setTimeout(() => row.classList.remove('highlight-row'), 1500);
+}
+
+
+/**
+ * Search positions by ticker or company name and show dropdown results
+ *
+ * @param {string} query - Search text
+ */
+function handleSearch(query) {
+  const dropdown = elements.searchResults;
+
+  if (!query || query.length < 1) {
+    dropdown.classList.add('hidden');
+    return;
+  }
+
+  const q = query.toLowerCase();
+  const matches = state.positions.filter(pos => {
+    const ticker = (pos.shortTicker || pos.ticker || '').toLowerCase();
+    const name = (pos.companyName || '').toLowerCase();
+    return ticker.includes(q) || name.includes(q);
+  }).slice(0, 8); // Limit to 8 results
+
+  if (matches.length === 0) {
+    dropdown.classList.add('hidden');
+    return;
+  }
+
+  let html = '';
+  for (const pos of matches) {
+    html += `
+      <div class="search-result-item" data-scroll-to="${pos.ticker}">
+        <div class="search-result-ticker">${pos.shortTicker || pos.ticker}</div>
+        <div class="search-result-name">${pos.companyName || ''}</div>
+      </div>
+    `;
+  }
+
+  dropdown.innerHTML = html;
+  dropdown.classList.remove('hidden');
+
+  // Add click handlers
+  dropdown.querySelectorAll('.search-result-item').forEach(el => {
+    el.addEventListener('click', () => {
+      scrollToPosition(el.dataset.scrollTo);
+      elements.searchInput.value = '';
+      dropdown.classList.add('hidden');
+    });
+  });
 }
 
 
@@ -591,12 +836,15 @@ function handlePositionsUpdate(data) {
   state.cash = data.cash;
   state.alerts = data.alerts || [];
   state.downtrends = data.downtrends || [];
+  state.uptrends = data.uptrends || [];
+  state.fxRates = data.fxRates || null;
 
   // Update UI
   renderSummary(data);
   renderPositions();
   renderAlerts(state.alerts);
   renderDowntrends(state.downtrends);
+  renderUptrends(state.uptrends);
   updateLastUpdateTime(data.lastUpdate, data.fromCache);
 
   // Clear any previous errors
@@ -659,6 +907,43 @@ function initialize() {
   elements.refreshBtn.addEventListener('click', onRefreshClick);
   elements.sortSelect.addEventListener('change', onSortChange);
   elements.errorDismiss.addEventListener('click', hideError);
+
+  // Panel toggle buttons for alerts and downtrends
+  elements.alertsBtn.addEventListener('click', () => {
+    togglePanel(elements.alertsPanel, elements.alertsBtn);
+  });
+  elements.downtrendsBtn.addEventListener('click', () => {
+    togglePanel(elements.downtrendsPanel, elements.downtrendsBtn);
+  });
+  elements.uptrendsBtn.addEventListener('click', () => {
+    togglePanel(elements.uptrendsPanel, elements.uptrendsBtn);
+  });
+
+  // Close buttons inside panels
+  document.querySelectorAll('.popup-panel-close').forEach(btn => {
+    btn.addEventListener('click', () => closeAllPanels());
+  });
+
+  // Search input - live search as user types
+  elements.searchInput.addEventListener('input', (e) => {
+    handleSearch(e.target.value.trim());
+  });
+
+  // Close search dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-wrapper')) {
+      elements.searchResults.classList.add('hidden');
+    }
+  });
+
+  // Keyboard navigation for search: Escape to close
+  elements.searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      elements.searchInput.value = '';
+      elements.searchResults.classList.add('hidden');
+      elements.searchInput.blur();
+    }
+  });
 
   // Request initial data (main process will use cache if available)
   window.api.requestPositions();

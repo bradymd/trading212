@@ -49,6 +49,10 @@ class DataStore {
         instruments: null,
         instrumentsCacheTime: null,
 
+        // Cached FX rates (e.g., { USD: 1.37, EUR: 1.19 })
+        fxRates: null,
+        fxRatesCacheTime: null,
+
         // User preferences
         preferences: {
           sortBy: 'totalReturnPercent', // Default sort column
@@ -301,6 +305,61 @@ class DataStore {
   }
 
 
+  /**
+   * Detect stocks that have been trending up over multiple days
+   *
+   * @param {number} days - Number of days to analyze (default: 5)
+   * @param {number} threshold - Minimum total gain % to flag (default: 10)
+   * @returns {Array} Array of trending up stocks with details
+   */
+  detectUptrends(days = 5, threshold = 10) {
+    const snapshots = this.store.get('snapshots');
+    const snapshotDates = Object.keys(snapshots).sort().slice(-days);
+
+    if (snapshotDates.length < 2) {
+      return [];
+    }
+
+    const firstSnapshot = snapshots[snapshotDates[0]];
+    const lastSnapshot = snapshots[snapshotDates[snapshotDates.length - 1]];
+
+    if (!firstSnapshot || !lastSnapshot) {
+      return [];
+    }
+
+    const firstDayMap = new Map();
+    for (const pos of firstSnapshot.positions) {
+      firstDayMap.set(pos.ticker, pos);
+    }
+
+    const uptrends = [];
+
+    for (const currentPos of lastSnapshot.positions) {
+      const startPos = firstDayMap.get(currentPos.ticker);
+
+      if (startPos) {
+        const startPrice = startPos.currentPrice;
+        const endPrice = currentPos.currentPrice;
+        const changePercent = ((endPrice - startPrice) / startPrice) * 100;
+
+        if (changePercent >= threshold) {
+          uptrends.push({
+            ticker: currentPos.ticker,
+            shortTicker: this._extractShortTicker(currentPos.ticker),
+            startPrice,
+            endPrice,
+            changePercent,
+            days: snapshotDates.length
+          });
+        }
+      }
+    }
+
+    // Sort by best performers first
+    return uptrends.sort((a, b) => b.changePercent - a.changePercent);
+  }
+
+
   // ===========================================================================
   // INSTRUMENTS CACHE
   // ===========================================================================
@@ -363,6 +422,51 @@ class DataStore {
 
     // Cache is valid for 24 hours
     return hoursSinceCache < 24;
+  }
+
+
+  // ===========================================================================
+  // FX RATES CACHE
+  // ===========================================================================
+
+  /**
+   * Save FX rates to disk cache
+   *
+   * @param {Object} rates - Rates object, e.g. { USD: 1.37, EUR: 1.19 }
+   */
+  saveFxRates(rates) {
+    this.store.set('fxRates', rates);
+    this.store.set('fxRatesCacheTime', new Date().toISOString());
+    console.log('[DataStore] Cached FX rates:', rates);
+  }
+
+
+  /**
+   * Get cached FX rates from disk
+   *
+   * @returns {Object|null} Rates object or null if not cached
+   */
+  getCachedFxRates() {
+    return this.store.get('fxRates');
+  }
+
+
+  /**
+   * Check if FX rates cache is valid (less than 1 hour old)
+   *
+   * @returns {boolean} True if cache exists and is fresh
+   */
+  isFxRatesCacheValid() {
+    const cacheTime = this.store.get('fxRatesCacheTime');
+    if (!cacheTime) {
+      return false;
+    }
+
+    const cacheDate = new Date(cacheTime);
+    const now = new Date();
+    const hoursSinceCache = (now - cacheDate) / (1000 * 60 * 60);
+
+    return hoursSinceCache < 1;
   }
 
 

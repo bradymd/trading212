@@ -38,6 +38,10 @@
       <div class="header-subtitle">Invest & ISA Accounts</div>
     </div>
     <div class="header-actions">
+      <div class="search-wrapper">
+        <input type="text" id="search-input" class="search-input" placeholder="Search ticker or company...">
+        <div id="search-results" class="search-results hidden"></div>
+      </div>
       <span id="last-update" class="last-update">Last update: --</span>
       <button id="refresh-btn" class="btn btn-primary">
         ↻ Refresh
@@ -113,6 +117,55 @@
           <option value="currentValue-desc">Value (Highest first)</option>
           <option value="shortTicker-asc">Ticker (A-Z)</option>
         </select>
+
+        <div class="controls-spacer"></div>
+
+        <button id="alerts-btn" class="btn-panel-toggle" title="Show alerts">
+          Alerts <span id="alert-count" class="count-badge">0</span>
+        </button>
+        <button id="downtrends-btn" class="btn-panel-toggle" title="Show multi-day downtrends">
+          ▼ Downtrends <span id="downtrend-count" class="count-badge">0</span>
+        </button>
+        <button id="uptrends-btn" class="btn-panel-toggle" title="Show multi-day uptrends">
+          ▲ Uptrends <span id="uptrend-count" class="count-badge">0</span>
+        </button>
+      </div>
+
+      <!-- Alerts popup panel -->
+      <div id="alerts-panel" class="popup-panel hidden">
+        <div class="popup-panel-header">
+          <h3>Alerts</h3>
+          <button class="popup-panel-close">✕</button>
+        </div>
+        <div id="alerts-container" class="popup-panel-body">
+          <p class="no-alerts">No alerts triggered today.</p>
+        </div>
+      </div>
+
+      <!-- Downtrends popup panel -->
+      <div id="downtrends-panel" class="popup-panel hidden">
+        <div class="popup-panel-header">
+          <h3>Multi-Day Downtrends</h3>
+          <button class="popup-panel-close">✕</button>
+        </div>
+        <div class="popup-panel-body">
+          <div id="downtrends-container">
+            <ul id="downtrends-list"></ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Uptrends popup panel -->
+      <div id="uptrends-panel" class="popup-panel hidden">
+        <div class="popup-panel-header">
+          <h3>Multi-Day Uptrends</h3>
+          <button class="popup-panel-close">✕</button>
+        </div>
+        <div class="popup-panel-body">
+          <div id="uptrends-container">
+            <ul id="uptrends-list"></ul>
+          </div>
+        </div>
       </div>
 
       <div class="table-container">
@@ -140,22 +193,7 @@
     </section>
 
 
-    <!-- --------------------------------------------------------------- -->
-    <!-- ALERTS SECTION -->
-    <!-- --------------------------------------------------------------- -->
-    <section class="alerts-section">
-      <h2>Alerts <span id="alert-count" class="count-badge">0</span></h2>
-
-      <div id="alerts-container" class="alerts-container">
-        <p class="no-alerts">No alerts triggered today.</p>
-      </div>
-
-      <!-- Downtrend Warnings -->
-      <div id="downtrends-container" class="downtrends-container hidden">
-        <h3>⚠️ Multi-Day Downtrends</h3>
-        <ul id="downtrends-list"></ul>
-      </div>
-    </section>
+    <!-- Alerts and Downtrends are now in popup panels above the table -->
 
   </main>
 

@@ -61,6 +61,7 @@ const { Trading212Client } = require('./api/trading212');
 const { DataStore } = require('./store/dataStore');
 const { AlertManager } = require('./alerts/alerts');
 const { IPC_CHANNELS, DEFAULTS } = require('../shared/constants');
+const { fetchFxRates } = require('./fx/fxRates');
 
 
 // =============================================================================
@@ -84,6 +85,9 @@ let config = null;
 // Cached instruments metadata (ticker -> name mapping)
 // Fetched once and reused - contains thousands of instruments
 let instrumentsMap = null;
+
+// Cached FX rates (GBP -> other currencies)
+let fxRates = null;
 
 
 // =============================================================================
@@ -380,7 +384,11 @@ async function loadFromCache(maxAgeMinutes = 30) {
 
     const positionsWithChanges = dataStore.calculateDailyChanges(positionsWithNames);
     const downtrends = dataStore.detectDowntrends(5, -10);
+    const uptrends = dataStore.detectUptrends(5, 10);
     const alerts = alertManager.checkAlerts(positionsWithChanges);
+
+    // Load FX rates (from cache or fetch if needed)
+    const cachedFxRates = await loadFxRates(positionsWithNames);
 
     // Send cached data to renderer with correct timestamp
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -389,6 +397,8 @@ async function loadFromCache(maxAgeMinutes = 30) {
         cash: cachedCash,
         alerts,
         downtrends,
+        uptrends,
+        fxRates: cachedFxRates,
         lastUpdate: lastFetchTime,
         fromCache: true  // Flag to indicate this is cached data
       });
@@ -399,6 +409,57 @@ async function loadFromCache(maxAgeMinutes = 30) {
     console.error('[Main] Error loading from cache:', error.message);
     return false;
   }
+}
+
+
+/**
+ * Load FX rates from cache or fetch from API
+ *
+ * Determines which currencies are needed by scanning positions,
+ * then loads from cache if fresh, or fetches from frankfurter.app.
+ *
+ * @param {Array} positions - Array of position objects with instrumentCurrency
+ * @returns {Promise<Object|null>} FX rates or null
+ */
+async function loadFxRates(positions) {
+  // Check memory cache first
+  if (fxRates && dataStore.isFxRatesCacheValid()) {
+    return fxRates;
+  }
+
+  // Try disk cache
+  if (dataStore.isFxRatesCacheValid()) {
+    fxRates = dataStore.getCachedFxRates();
+    if (fxRates) {
+      console.log('[Main] Loaded FX rates from disk cache:', fxRates);
+      return fxRates;
+    }
+  }
+
+  // Determine which currencies we need
+  const currencies = new Set();
+  for (const pos of positions) {
+    const currency = pos.instrumentCurrency || null;
+    if (currency && currency !== 'GBP' && currency !== 'GBX') {
+      currencies.add(currency);
+    }
+  }
+
+  if (currencies.size === 0) {
+    console.log('[Main] No non-GBP currencies in portfolio, skipping FX fetch');
+    return null;
+  }
+
+  // Fetch from API
+  console.log('[Main] Fetching FX rates for:', [...currencies]);
+  const rates = await fetchFxRates([...currencies]);
+
+  if (rates) {
+    fxRates = rates;
+    dataStore.saveFxRates(rates);
+  }
+
+  return fxRates;
 }
 
 
@@ -490,14 +551,18 @@ async function refreshData() {
     // Calculate daily changes (adds dailyChangePercent to each position)
     const positionsWithChanges = dataStore.calculateDailyChanges(positionsWithNames);
 
+    // Fetch FX rates for non-GBP positions (for GBP equivalent display)
+    const currentFxRates = await loadFxRates(positionsWithNames);
+
     // Save snapshot for historical tracking
     dataStore.saveSnapshot(positions);
 
     // Check for alerts
     const alerts = alertManager.checkAlerts(positionsWithChanges);
 
-    // Also check for multi-day downtrends
+    // Also check for multi-day trends
     const downtrends = dataStore.detectDowntrends(5, -10);
+    const uptrends = dataStore.detectUptrends(5, 10);
     alertManager.checkDowntrendAlerts(downtrends);
 
     // Send data to renderer
@@ -507,6 +572,8 @@ async function refreshData() {
         cash,
         alerts,
         downtrends,
+        uptrends,
+        fxRates: currentFxRates,
         lastUpdate: new Date().toISOString(),
         fromCache: false  // This is fresh API data
       });
