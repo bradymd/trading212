@@ -124,6 +124,22 @@ function normalizePriceToGbp(price, position) {
 
 
 /**
+ * Get the display currency code for an instrument
+ *
+ * Maps instrument currencies to valid ISO 4217 codes for formatting.
+ * GBX (pence) becomes GBP since prices are normalized to pounds before display.
+ *
+ * @param {string} instrumentCurrency - The instrument's currency code from the API
+ * @returns {string} Valid currency code for display
+ */
+function getDisplayCurrency(instrumentCurrency) {
+  if (!instrumentCurrency) return 'GBP';
+  if (instrumentCurrency === 'GBX') return 'GBP';
+  return instrumentCurrency;
+}
+
+
+/**
  * Format a number as currency (GBP)
  *
  * @param {number} value - The number to format
@@ -384,6 +400,7 @@ function renderPositions() {
       const avgPrice = normalizePriceToGbp(pos.averagePrice, pos);
       const curPrice = normalizePriceToGbp(pos.currentPrice, pos);
       const currentValue = pos.quantity * curPrice;
+      const displayCurrency = getDisplayCurrency(pos.instrumentCurrency);
 
       // P/L is already in account currency (GBP), don't normalize it
       // (API returns prices in pence for UK stocks, but P/L is always in GBP)
@@ -404,10 +421,11 @@ function renderPositions() {
         // Daily change also needs normalization for UK stocks
         const normalizedDailyChange = normalizePriceToGbp(pos.dailyChange, pos);
         const changeAmount = normalizedDailyChange * pos.quantity;
+        const arrow = normalizedDailyChange > 0 ? '▲' : normalizedDailyChange < 0 ? '▼' : '';
         dailyChangeDisplay = `
-          <span class="${dailyChangeClass}">${formatCurrency(changeAmount)}</span>
+          <span class="${dailyChangeClass}">${arrow} ${formatCurrency(Math.abs(normalizedDailyChange), displayCurrency)}</span>
           <br>
-          <small class="${dailyChangeClass}">${formatPercent(pos.dailyChangePercent)}</small>
+          <small class="${dailyChangeClass}">${formatCurrency(changeAmount, displayCurrency)} (${formatPercent(pos.dailyChangePercent)})</small>
         `;
       }
 
@@ -426,9 +444,9 @@ function renderPositions() {
         <tr>
           <td class="ticker-cell" title="${hoverTitle}">${tickerCellContent}</td>
           <td>${pos.quantity.toFixed(4)}</td>
-          <td class="number">${formatCurrency(avgPrice)}</td>
-          <td class="number">${formatCurrency(curPrice)}</td>
-          <td class="number">${formatCurrency(currentValue)}</td>
+          <td class="number">${formatCurrency(avgPrice, displayCurrency)}</td>
+          <td class="number">${formatCurrency(curPrice, displayCurrency)}</td>
+          <td class="number">${formatCurrency(currentValue, displayCurrency)}</td>
           <td class="number">
             <span class="${totalReturnClass}">${formatPercent(totalReturnPercent)}</span>
           </td>
@@ -495,14 +513,25 @@ function renderDowntrends(downtrends) {
 
   elements.downtrendsContainer.classList.remove('hidden');
 
+  // Build a lookup from ticker to instrumentCurrency from current positions
+  const currencyMap = new Map();
+  for (const pos of state.positions) {
+    currencyMap.set(pos.ticker, getDisplayCurrency(pos.instrumentCurrency));
+  }
+
   let html = '';
 
   for (const trend of downtrends) {
+    const currency = currencyMap.get(trend.ticker) || 'GBP';
+    // Downtrend prices need GBX normalization too
+    const pos = state.positions.find(p => p.ticker === trend.ticker);
+    const startPrice = pos ? normalizePriceToGbp(trend.startPrice, pos) : trend.startPrice;
+    const endPrice = pos ? normalizePriceToGbp(trend.endPrice, pos) : trend.endPrice;
     html += `
       <li>
         <strong class="loss">${trend.shortTicker}</strong>:
         Down ${Math.abs(trend.changePercent).toFixed(2)}% over ${trend.days} days
-        (${formatCurrency(trend.startPrice)} → ${formatCurrency(trend.endPrice)})
+        (${formatCurrency(startPrice, currency)} → ${formatCurrency(endPrice, currency)})
       </li>
     `;
   }

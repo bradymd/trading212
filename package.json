@@ -1,6 +1,6 @@
 {
   "name": "trading212-viewer",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Read-only portfolio viewer for Trading 212 Invest & ISA accounts",
   "main": "src/main/main.js",
   "scripts": {
@@ -44,7 +44,7 @@
         "deb"
       ],
       "category": "Finance",
-      "icon": "build/icon.png",
+      "icon": "build/icons",
       "desktop": {
         "Name": "Trading 212 Viewer",
         "Comment": "View your Trading 212 Invest & ISA portfolio",
